@@ -1,0 +1,59 @@
+services:
+  s3:
+    image: minio/minio:latest
+    container_name: s3-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - s3-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.5.0
+    container_name: toxiproxy-s3
+    ports:
+      - "20000:20000"
+      - "8474:8474"
+    networks:
+      - s3-network
+    depends_on:
+      s3:
+        condition: service_healthy
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    container_name: php-dev
+    working_dir: /app
+    volumes:
+      - .:/app
+    networks:
+      - s3-network
+    depends_on:
+      toxiproxy:
+        condition: service_started
+    environment:
+      S3_ENDPOINT: http://toxiproxy:20000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    entrypoint: /bin/sh
+    command: ["-c", "tail -f /dev/null"]
+
+volumes:
+  minio_data:
+
+networks:
+  s3-network:
+    driver: bridge
