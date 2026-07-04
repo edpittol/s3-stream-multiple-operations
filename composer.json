@@ -1,0 +1,9 @@
+{
+    "name": "edpittol/s3-stream-multiple-operations",
+    "description": "S3 stream operations with multiple concurrency patterns",
+    "type": "library",
+    "require": {
+        "php": "^8.5",
+        "aws/aws-sdk-php": "^3"
+    }
+}
