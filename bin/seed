@@ -1,0 +1,14 @@
+#!/bin/bash
+# Seed the benchmark bucket with 200 distinct ~1 KB objects via PHP SDK through Toxiproxy.
+# Run this in the php container with the Docker environment up.
+
+set -e
+
+# Ensure we're running from the project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo "Running seed script in php container..."
+docker compose -f "$PROJECT_ROOT/compose.yaml" exec php php src/seed.php
+
+exit $?
