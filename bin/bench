@@ -49,16 +49,13 @@ for rtt in "${RTT_VALUES[@]}"; do
                     \"latency\": $rtt,
                     \"jitter\": 0
                 }
-            }" > /dev/null 2>&1 || true
+            }" > /dev/null 2>&1 || echo "  (Warning: Could not configure Toxiproxy latency - is Toxiproxy running?)"
     else
-        # Remove toxics for 0 RTT
-        curl -s -X GET http://localhost:8474/proxies/minio/toxics \
-            -H "Content-Type: application/json" | \
-            jq -r '.[] | .name' | \
-            while read toxic_name; do
-                [ -n "$toxic_name" ] && \
-                curl -s -X DELETE "http://localhost:8474/proxies/minio/toxics/$toxic_name" > /dev/null 2>&1 || true
-            done
+        # Remove toxics for 0 RTT (best-effort cleanup)
+        # Use a simple loop instead of jq which might not be available
+        for i in {1..10}; do
+            curl -s -X DELETE "http://localhost:8474/proxies/minio/toxics/latency-${i}ms" > /dev/null 2>&1 || true
+        done
     fi
 
     # Small delay to ensure Toxiproxy is ready
