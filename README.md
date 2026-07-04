@@ -50,7 +50,7 @@ Services available at:
 To verify the entire PHP → Toxiproxy → MinIO path works correctly, run:
 
 ```bash
-docker-compose exec php bin/smoke-test-e2e.php
+docker compose exec php bin/smoke-test-e2e.php
 ```
 
 This smoke test will:

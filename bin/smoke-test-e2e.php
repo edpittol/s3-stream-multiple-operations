@@ -8,14 +8,7 @@
  * PHP → Toxiproxy → MinIO.
  */
 
-$autoloaderPath = __DIR__ . '/../vendor/autoload.php';
-
-if (!file_exists($autoloaderPath)) {
-    fwrite(STDERR, "Error: Composer autoloader not found at $autoloaderPath\n");
-    exit(1);
-}
-
-require_once $autoloaderPath;
+require_once __DIR__ . '/../vendor/autoload.php';
 
 try {
     // Create S3 client pointing to Toxiproxy (which forwards to MinIO)

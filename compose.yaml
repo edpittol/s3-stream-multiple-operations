@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   s3:
     image: minio/minio:latest
@@ -44,8 +42,6 @@ services:
     networks:
       - s3-network
     depends_on:
-      s3:
-        condition: service_healthy
       toxiproxy:
         condition: service_started
     environment:
