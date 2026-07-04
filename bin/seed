@@ -9,6 +9,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "Running seed script in php container..."
-docker compose -f "$PROJECT_ROOT/compose.yaml" exec php php src/seed.php
+docker compose exec php php src/seed.php
 
 exit $?
