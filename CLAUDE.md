@@ -1,3 +1,7 @@
+## Formatting
+
+- Do not escape the grave accent (backtick) when writing docs. Use it literally for inline code and fenced code blocks — do not precede it with a backslash.
+
 ## Agent skills
 
 ### Issue tracker
