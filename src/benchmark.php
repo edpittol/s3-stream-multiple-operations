@@ -53,10 +53,13 @@ if (!mkdir($tmpDir, 0777, true)) {
 // For s3:// backend, set up S3 client
 $s3Client = null;
 if ($backend === 's3') {
+    // Use S3_ENDPOINT env var if set (for Docker), otherwise localhost
+    $s3Endpoint = getenv('S3_ENDPOINT') ?: 'http://localhost:20000';
+
     $s3Client = new \Aws\S3\S3Client([
         'version' => 'latest',
         'region'  => 'us-east-1',
-        'endpoint' => 'http://toxiproxy:20000',
+        'endpoint' => $s3Endpoint,
         'use_path_style_endpoint' => true,
         'credentials' => [
             'key'    => 'minioadmin',

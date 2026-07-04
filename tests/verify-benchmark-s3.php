@@ -14,15 +14,21 @@ try {
     echo "Testing s3:// benchmark functionality (requires Docker stack)...\n\n";
 
     // Check if Toxiproxy is reachable
-    echo "✓ Checking Toxiproxy availability...\n";
-    $handle = @fsockopen('localhost', 8474, $errno, $errstr, 2);
+    echo "✓ Checking S3 endpoint availability...\n";
+    // Try Docker hostname first, then fallback to localhost
+    $toxiproxyHost = 'toxiproxy';
+    $handle = @fsockopen($toxiproxyHost, 8474, $errno, $errstr, 2);
+    if (!$handle) {
+        $toxiproxyHost = 'localhost';
+        $handle = @fsockopen($toxiproxyHost, 8474, $errno, $errstr, 2);
+    }
+
     if ($handle) {
         fclose($handle);
-        echo "  ✓ Toxiproxy is reachable on localhost:8474\n";
+        echo "  ✓ Toxiproxy is reachable on $toxiproxyHost:8474\n";
     } else {
-        echo "  ✗ Toxiproxy not reachable on localhost:8474\n";
-        echo "  Skipping S3 tests. Run: ./bin/up && docker compose exec php tests/verify-benchmark-s3.php\n";
-        exit(0); // Skip rather than fail
+        echo "  ✗ Toxiproxy not reachable (needed for latency injection)\n";
+        echo "  Continuing with basic S3 benchmarks...\n";
     }
 
     // Test 1: S3 file_exists benchmark
