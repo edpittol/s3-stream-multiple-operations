@@ -73,3 +73,84 @@ This will:
 - Stop all containers
 - Remove containers and networks
 - Delete all data volumes (including MinIO data)
+
+## Running Benchmarks
+
+### RTT-Sweep Benchmark
+
+The benchmark measures latency of S3 file operations (file_exists, stat, file_put_contents) across varying network latency conditions. It sweeps through different RTT (Round-Trip Time) values: 0ms, 20ms, 75ms, and 125ms.
+
+**Prerequisites**: The Docker environment must be running:
+
+```bash
+./bin/up
+```
+
+The benchmark suite will seed MinIO with test objects automatically when needed.
+
+### Running the Full Benchmark Suite
+
+To run the complete RTT-sweep benchmark across all operations and backends:
+
+```bash
+./bin/bench
+```
+
+This will:
+- Sweep RTT values (0, 20, 75, 125 ms) using Toxiproxy latency injection
+- Run all operations (file_exists, stat, file_put_contents)
+- Test both backends (local filesystem, S3)
+- Output results to `results/benchmark-<timestamp>.csv`
+- Display per-operation page-time analysis (assuming 88 ops per page view)
+- Verify latency scaling
+
+### Example Output
+
+```
+Starting benchmark sweep...
+Output: results/benchmark-1719939900.csv
+
+Setting Toxiproxy latency to 0ms...
+  Benchmarking: op=file_exists backend=local rtt=0ms
+  Benchmarking: op=file_exists backend=s3 rtt=0ms
+  ...
+✓ Benchmark complete!
+Results written to: results/benchmark-1719939900.csv
+
+Reconstructed page-time analysis (median per-op × 88):
+  local / file_exists: 12345ns × 88 = 1ms
+  s3 / file_exists: 45678ns × 88 = 4ms
+  ...
+```
+
+### Running Individual Benchmark Operations
+
+For testing a single operation or backend, use the PHP script directly:
+
+```bash
+# Test file_exists on local filesystem
+php src/benchmark.php --backend local --op file_exists
+
+# Test file_put_contents on S3 with 50ms RTT
+php src/benchmark.php --backend s3 --op file_put_contents --rtt-ms 50
+
+# Output to CSV file
+php src/benchmark.php --backend s3 --op stat --rtt-ms 75 --output results/custom-benchmark.csv
+```
+
+### Understanding the CSV Output
+
+The benchmark outputs CSV with the following columns:
+- **scenario**: Type of benchmark (currently "benchmark")
+- **op**: Operation tested (file_exists, stat, file_put_contents)
+- **backend**: Backend used (local, s3)
+- **rtt_ms**: Injected RTT in milliseconds (0, 20, 75, 125)
+- **n**: Number of distinct keys tested (200 per repetition)
+- **median_ns**: Median operation latency in nanoseconds
+- **p95_ns**: 95th percentile latency in nanoseconds
+- **min_ns**: Minimum operation latency in nanoseconds
+- **max_ns**: Maximum operation latency in nanoseconds
+
+### Interpreting Results
+
+Each benchmark run measures 5 repetitions of 200 distinct file operations (1000 total operations per test). The RTT-sweep helps identify how network latency impacts S3 operations compared to local filesystem operations. The `median_ns` column is typically used for page-time reconstruction (multiply by ~88 for typical S3-backed CMS page view).
