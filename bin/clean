@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+
+echo "Cleaning up S3 benchmark stack..."
+
+# Stop and remove containers
+docker compose down -v --remove-orphans
+
+echo "✓ Stack cleaned up (containers removed, volumes deleted)"

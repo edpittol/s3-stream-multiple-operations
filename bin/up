@@ -1,0 +1,37 @@
+#!/bin/bash
+set -e
+
+echo "Starting S3 benchmark stack (MinIO + Toxiproxy + PHP)..."
+
+# Start services
+docker compose up -d
+
+# Wait for services to be healthy
+echo "Waiting for services to be ready..."
+sleep 3
+
+# Configure Toxiproxy to proxy to MinIO
+echo "Configuring Toxiproxy..."
+curl -X POST http://localhost:8474/proxies \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "minio",
+    "listen": "[::]:20000",
+    "upstream": "s3-minio:9000",
+    "enabled": true
+  }' || echo "Toxiproxy proxy may already exist"
+
+# Wait a bit for Toxiproxy to be ready
+sleep 2
+
+echo "✓ Stack is up!"
+echo ""
+echo "Services:"
+echo "  - MinIO S3: http://localhost:9000"
+echo "  - MinIO Console: http://localhost:9001"
+echo "  - Toxiproxy listener: http://localhost:20000 (points to MinIO S3)"
+echo "  - Toxiproxy admin: http://localhost:8474"
+echo "  - PHP container: ready for commands"
+echo ""
+echo "To run the smoke test:"
+echo "  docker compose exec php bin/smoke-test-e2e.php"
