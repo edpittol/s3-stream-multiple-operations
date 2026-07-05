@@ -78,7 +78,7 @@ This will:
 
 ### RTT-Sweep Benchmark
 
-The benchmark measures latency of S3 file operations (file_exists, stat, file_put_contents) across varying network latency conditions. It sweeps through different RTT (Round-Trip Time) values: 0ms, 20ms, 75ms, and 125ms.
+The benchmark measures latency of S3 file operations (file_exists, stat, file_put_contents) across varying network latency conditions. It sweeps through different RTT (Round-Trip Time) values: 0ms, 10ms, 20ms, and 40ms.
 
 **Prerequisites**: The Docker environment must be running:
 
@@ -97,7 +97,7 @@ To run the complete RTT-sweep benchmark across all operations and backends:
 ```
 
 This will:
-- Sweep RTT values (0, 20, 75, 125 ms) using Toxiproxy latency injection
+- Sweep RTT values (0, 10, 20, 40 ms) using Toxiproxy latency injection
 - Run all operations (file_exists, stat, file_put_contents)
 - Test both backends (local filesystem, S3)
 - Output results to `results/benchmark-<timestamp>.csv`
@@ -144,7 +144,7 @@ The benchmark outputs CSV with the following columns:
 - **scenario**: Type of benchmark (currently "benchmark")
 - **op**: Operation tested (file_exists, stat, file_put_contents)
 - **backend**: Backend used (local, s3)
-- **rtt_ms**: Injected RTT in milliseconds (0, 20, 75, 125)
+- **rtt_ms**: Injected RTT in milliseconds (0, 10, 20, 40)
 - **n**: Number of distinct keys tested (200 per repetition)
 - **median_ns**: Median operation latency in nanoseconds
 - **p95_ns**: 95th percentile latency in nanoseconds
