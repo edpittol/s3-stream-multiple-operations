@@ -11,19 +11,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 try {
-    // Create S3 client pointing to Toxiproxy (which forwards to MinIO)
-    $s3Client = new \Aws\S3\S3Client([
-        'version' => 'latest',
-        'region'  => 'us-east-1',
-        'endpoint' => 'http://toxiproxy:20000', // Toxiproxy listener
-        'use_path_style_endpoint' => true,
-        'credentials' => [
-            'key'    => 'minioadmin',
-            'secret' => 'minioadmin',
-        ],
-    ]);
-
-    // Register S3 stream wrapper
+    $s3Client = createS3Client();
     $s3Client->registerStreamWrapper();
 
     // Smoke test: write and read back an object
@@ -33,15 +21,7 @@ try {
 
     echo "Testing S3 stream wrapper through Toxiproxy...\n";
 
-    // Ensure bucket exists
-    try {
-        $s3Client->headBucket(['Bucket' => $bucket]);
-    } catch (\Exception $e) {
-        echo "Creating bucket: $bucket\n";
-        $s3Client->createBucket(['Bucket' => $bucket]);
-        // Wait for bucket to be created
-        sleep(1);
-    }
+    ensureBucketExists($s3Client, $bucket);
 
     // Write via stream wrapper
     echo "✓ Writing object via s3:// stream wrapper\n";

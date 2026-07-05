@@ -8,20 +8,6 @@ After cloning the repository, install dependencies with Composer:
 composer install
 ```
 
-## Verifying the AWS SDK Installation
-
-To verify that the AWS SDK is correctly installed and compatible with your PHP environment, run the smoke-test script:
-
-```bash
-php bin/verify-sdk.php
-```
-
-This script will:
-- Load the Composer autoloader
-- Instantiate `Aws\S3\S3Client` with dummy credentials
-- Confirm PHP version compatibility and successful class resolution
-- Exit with a clear success message or error if setup is incomplete
-
 ## Docker Environment Setup
 
 A complete Docker Compose environment is provided to test S3 stream operations with a realistic setup including MinIO (S3-compatible storage), Toxiproxy (for latency injection), and PHP with the AWS SDK.
@@ -64,14 +50,14 @@ Each stack is namespaced by the Compose **project name**, so containers, the net
 
   If bringing a stack up hits a name/port collision, `bin/env up` prints guidance to re-run with `-p <name>`.
 
-`bin/env seed`, `bin/env bench`, `bin/env clean`, and the smoke test all accept the same `-p <name>` flag and act on that instance only. Reach a specific instance's containers with `docker compose -p <name> exec ...`.
+`bin/env seed`, `bin/env bench`, `bin/env clean`, and the verification tests all accept the same `-p <name>` flag and act on that instance only. Reach a specific instance's containers with `docker compose -p <name> exec ...`.
 
 ### Running the End-to-End Smoke Test
 
 To verify the entire PHP → Toxiproxy → MinIO path works correctly, run:
 
 ```bash
-docker compose exec php bin/smoke-test-e2e.php
+docker compose exec php tests/smoke-test-e2e.php
 ```
 
 This smoke test will:

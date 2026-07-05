@@ -4,8 +4,8 @@
  * Verification script for S3 benchmark functionality (requires Docker stack running).
  * Tests that benchmark.php can time operations on s3:// through Toxiproxy.
  *
- * Usage: Run from Docker container with: docker compose exec php bin/verify-benchmark-s3.php
- * Or from host with Docker stack running on localhost
+ * Usage: Run from Docker container with: docker compose exec php tests/verify-benchmark-s3.php
+ * The environment variables (S3_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY) must be available.
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';

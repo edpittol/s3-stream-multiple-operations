@@ -53,30 +53,9 @@ if (!mkdir($tmpDir, 0777, true)) {
 // For s3:// backend, set up S3 client
 $s3Client = null;
 if ($backend === 's3') {
-    // Use S3_ENDPOINT env var if set (for Docker), otherwise localhost
-    $s3Endpoint = getenv('S3_ENDPOINT') ?: 'http://localhost:20000';
-
-    $s3Client = new \Aws\S3\S3Client([
-        'version' => 'latest',
-        'region'  => 'us-east-1',
-        'endpoint' => $s3Endpoint,
-        'use_path_style_endpoint' => true,
-        'credentials' => [
-            'key'    => 'minioadmin',
-            'secret' => 'minioadmin',
-        ],
-    ]);
-
-    // Register stream wrapper
+    $s3Client = createS3Client();
     $s3Client->registerStreamWrapper();
-
-    // Ensure bucket exists
-    try {
-        $s3Client->headBucket(['Bucket' => $bucket]);
-    } catch (\Exception $e) {
-        $s3Client->createBucket(['Bucket' => $bucket]);
-        usleep(500000); // 500ms wait for bucket creation
-    }
+    ensureBucketExists($s3Client, $bucket);
 }
 
 try {
