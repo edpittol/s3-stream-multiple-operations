@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+# Reads results/*.csv (RTT-sweep benchmark-<timestamp>.csv files and
+# cache-scope-benchmark.csv) and writes RESULTS.md at the project root.
+# Runs locally against the host filesystem -- no Docker environment needed,
+# just the results already produced by `bin/env bench` / the cache-scope
+# benchmark.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+php "$PROJECT_ROOT/src/report.php"
