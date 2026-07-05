@@ -1,37 +1,68 @@
 #!/bin/bash
 set -e
 
+# Bring up an isolated MinIO + Toxiproxy + PHP stack.
+#
+# By default the Compose project name is auto-derived from the working
+# directory, so two clones/worktrees run in parallel with no config. Use
+# `-p <name>` to start a second isolated instance from the same directory.
+
+PROJECT=""
+while getopts "p:h" opt; do
+  case "$opt" in
+    p) PROJECT="$OPTARG" ;;
+    h) echo "Usage: bin/up [-p <project-name>]"; exit 0 ;;
+    *) echo "Usage: bin/up [-p <project-name>]" >&2; exit 1 ;;
+  esac
+done
+
+# All Compose commands run against the selected instance.
+dc() { docker compose ${PROJECT:+-p "$PROJECT"} "$@"; }
+
 echo "Starting S3 benchmark stack (MinIO + Toxiproxy + PHP)..."
 
-# Start services
-docker compose up -d
+if ! dc up -d; then
+  echo "" >&2
+  echo "✗ Failed to bring up the stack." >&2
+  echo "  This is usually a name/port collision with another instance." >&2
+  echo "  Start an isolated instance under a different project name:" >&2
+  echo "" >&2
+  echo "      bin/up -p <name>" >&2
+  echo "" >&2
+  exit 1
+fi
 
-# Wait for services to be healthy
-echo "Waiting for services to be ready..."
-sleep 3
+# Configure Toxiproxy against the s3 service by name, over the internal
+# network via the container CLI — no dependency on a host admin port.
+echo "Configuring Toxiproxy (upstream s3:9000)..."
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  if dc exec -T toxiproxy /toxiproxy-cli create -l 0.0.0.0:20000 -u s3:9000 minio >/dev/null 2>&1; then
+    break
+  fi
+  # Already-exists is fine; only keep retrying while the admin API is not up yet.
+  if dc exec -T toxiproxy /toxiproxy-cli list >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+done
 
-# Configure Toxiproxy to proxy to MinIO
-echo "Configuring Toxiproxy..."
-curl -X POST http://localhost:8474/proxies \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "minio",
-    "listen": "[::]:20000",
-    "upstream": "s3-minio:9000",
-    "enabled": true
-  }' || echo "Toxiproxy proxy may already exist"
-
-# Wait a bit for Toxiproxy to be ready
-sleep 2
-
+echo ""
 echo "✓ Stack is up!"
 echo ""
-echo "Services:"
-echo "  - MinIO S3: http://localhost:9000"
-echo "  - MinIO Console: http://localhost:9001"
-echo "  - Toxiproxy listener: http://localhost:20000 (points to MinIO S3)"
-echo "  - Toxiproxy admin: http://localhost:8474"
-echo "  - PHP container: ready for commands"
+echo "Services (host URLs for this instance):"
+
+# Only the MinIO console publishes an (ephemeral) host port; print its mapping.
+CONSOLE="$(dc port s3 9001 2>/dev/null || true)"
+if [ -n "$CONSOLE" ]; then
+  echo "  - MinIO Console: http://${CONSOLE}"
+else
+  echo "  - MinIO Console: (no published port found)"
+fi
+echo "  - S3 API / Toxiproxy: internal network only (s3:9000, toxiproxy:20000)"
 echo ""
-echo "To run the smoke test:"
-echo "  docker compose exec php bin/smoke-test-e2e.php"
+echo "To run the smoke test against this instance:"
+if [ -n "$PROJECT" ]; then
+  echo "  docker compose -p $PROJECT exec php bin/smoke-test-e2e.php"
+else
+  echo "  docker compose exec php bin/smoke-test-e2e.php"
+fi

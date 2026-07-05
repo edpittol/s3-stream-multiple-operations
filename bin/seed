@@ -4,11 +4,20 @@
 
 set -e
 
-# Ensure we're running from the project root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Seeds the instance selected by the Compose project name (auto-derived from
+# the working directory, or `-p <name>`).
+PROJECT=""
+while getopts "p:h" opt; do
+  case "$opt" in
+    p) PROJECT="$OPTARG" ;;
+    h) echo "Usage: bin/seed [-p <project-name>]"; exit 0 ;;
+    *) echo "Usage: bin/seed [-p <project-name>]" >&2; exit 1 ;;
+  esac
+done
+
+dc() { docker compose ${PROJECT:+-p "$PROJECT"} "$@"; }
 
 echo "Running seed script in php container..."
-docker compose exec php php src/seed.php
+dc exec -T php php src/seed.php
 
 exit $?
