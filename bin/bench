@@ -1,0 +1,106 @@
+#!/bin/bash
+set -e
+
+# Benchmark orchestrator: sweeps RTT 0/10/20/40 ms, runs benchmark in fresh process per data point
+# Outputs CSV to results/benchmark-<timestamp>.csv with columns:
+# scenario, op, backend, rtt_ms, n, median_ns, p95_ns, min_ns, max_ns
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+RESULTS_DIR="$PROJECT_ROOT/results"
+
+# Create results directory
+mkdir -p "$RESULTS_DIR"
+
+# Output file with timestamp
+TIMESTAMP=$(date +%s)
+OUTPUT_FILE="$RESULTS_DIR/benchmark-$TIMESTAMP.csv"
+
+# RTT values to sweep
+RTT_VALUES=(0 10 20 40)
+
+# Operations to benchmark
+OPS=("file_exists" "stat" "file_put_contents")
+
+# Backends
+BACKENDS=("local" "s3")
+
+echo "Starting benchmark sweep..."
+echo "Output: $OUTPUT_FILE"
+echo ""
+
+# Write CSV header
+echo "scenario,op,backend,rtt_ms,n,median_ns,p95_ns,min_ns,max_ns" > "$OUTPUT_FILE"
+
+# Sweep across all combinations
+for rtt in "${RTT_VALUES[@]}"; do
+    echo "Setting Toxiproxy latency to ${rtt}ms..."
+
+    # Configure Toxiproxy latency toxic (only for s3)
+    if [ "$rtt" -gt 0 ]; then
+        curl -s -X POST http://localhost:8474/proxies/minio/toxics \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"name\": \"latency-${rtt}ms\",
+                \"type\": \"latency\",
+                \"stream\": \"upstream\",
+                \"toxicity\": 1.0,
+                \"attributes\": {
+                    \"latency\": $rtt,
+                    \"jitter\": 0
+                }
+            }" > /dev/null 2>&1 || echo "  (Warning: Could not configure Toxiproxy latency - is Toxiproxy running?)"
+    else
+        # Remove toxics for 0 RTT (best-effort cleanup)
+        # Use a simple loop instead of jq which might not be available
+        for i in {1..10}; do
+            curl -s -X DELETE "http://localhost:8474/proxies/minio/toxics/latency-${i}ms" > /dev/null 2>&1 || true
+        done
+    fi
+
+    # Small delay to ensure Toxiproxy is ready
+    sleep 0.5
+
+    # Run benchmark for each operation and backend
+    for op in "${OPS[@]}"; do
+        for backend in "${BACKENDS[@]}"; do
+            echo "  Benchmarking: op=$op backend=$backend rtt=${rtt}ms"
+
+            # Run benchmark in fresh process
+            php "$PROJECT_ROOT/src/benchmark.php" \
+                --backend "$backend" \
+                --op "$op" \
+                --rtt-ms "$rtt" \
+                --output "$OUTPUT_FILE"
+        done
+    done
+done
+
+echo ""
+echo "✓ Benchmark complete!"
+echo "Results written to: $OUTPUT_FILE"
+
+# Calculate and display reconstructed page-time figure
+echo ""
+echo "Reconstructed page-time analysis (median per-op × 88):"
+awk -F',' 'NR>1 {
+    op=$2;
+    median=$6;
+    ops_per_page=88;
+    page_time_ns=median*ops_per_page;
+    page_time_ms=page_time_ns/1000000;
+    print "  " $3 " / " op ": " median "ns × 88 = " int(page_time_ms) "ms"
+}' "$OUTPUT_FILE" | sort | uniq
+
+echo ""
+echo "Verifying latency scaling with RTT:"
+awk -F',' 'NR>1 && $4 != prevRtt {
+    if (prevRtt != "") print ""
+    prevRtt=$4;
+    print "  RTT " $4 "ms:"
+}
+NR>1 {
+    op=$2;
+    median=$6;
+    printf "    %-20s: %d ns\n", op, median
+}' "$OUTPUT_FILE"
