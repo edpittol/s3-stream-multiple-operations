@@ -83,7 +83,7 @@ for rtt in "${RTT_VALUES[@]}"; do
 done
 
 echo ""
-echo "✓ Benchmark complete!"
+echo "✓ RTT-sweep benchmark complete!"
 echo "Results written to: $OUTPUT_FILE"
 
 # Calculate and display reconstructed page-time figure
@@ -110,3 +110,13 @@ NR>1 {
     median=$6;
     printf "    %-20s: %d ns\n", op, median
 }' "$OUTPUT_FILE"
+
+# Run cache-scope benchmark
+echo ""
+echo "---"
+echo "Running cache-scope benchmark..."
+echo ""
+dc exec -T php php bin/benchmark-cache-scope.php
+
+echo ""
+echo "✓ All benchmarks complete!"

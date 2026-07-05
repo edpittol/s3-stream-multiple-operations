@@ -105,17 +105,17 @@ This acts on the selected instance only — cleaning one leaves any other runnin
 The full flow, in order, is: bring the stack up, seed it, run the benchmarks, then generate the report.
 
 ```bash
-./bin/env up                                          # docker compose up -d (+ Toxiproxy config)
-./bin/env seed                                         # docker compose exec php src/seed.php
-./bin/env bench                                        # docker compose exec php src/benchmark.php (RTT sweep)
-docker compose exec php bin/benchmark-cache-scope.php  # cache-scope benchmark (no bin/env wrapper)
-./bin/report                                           # php src/report.php
+./bin/env up            # docker compose up -d (+ Toxiproxy config)
+./bin/env seed          # docker compose exec php src/seed.php
+./bin/env bench         # RTT sweep + cache-scope benchmark
+./bin/report            # php src/report.php
 ```
 
 **`bin/env seed` is required, not automatic** — both benchmarks below read fixed, pre-seeded object keys (`benchmark-object-000`, `benchmark-object-001`, ...) and fail if the bucket hasn't been seeded first.
 
-- **RTT-sweep benchmark** (`./bin/env bench`): sweeps Toxiproxy latency (0, 10, 20, 40 ms) and times `file_exists`, `stat`, and `file_put_contents` against both `local` and `s3://` backends, 200 keys × 5 reps per data point. Writes `results/benchmark-<timestamp>.csv`.
-- **Cache-scope benchmark** (`docker compose exec php bin/benchmark-cache-scope.php`): proves the AWS SDK's `LruArrayCache` stat cache is request-scoped — it stats the same seeded key 5× within one PHP process (1 HTTP call + 4 cache hits), then once each in two separate processes (2 HTTP calls, no carry-over). Writes `results/cache-scope-benchmark.csv`.
+`./bin/env bench` runs both benchmarks:
+- **RTT-sweep**: sweeps Toxiproxy latency (0, 10, 20, 40 ms) and times `file_exists`, `stat`, and `file_put_contents` against both `local` and `s3://` backends, 200 keys × 5 reps per data point. Writes `results/benchmark-<timestamp>.csv`.
+- **Cache-scope**: proves the AWS SDK's `LruArrayCache` stat cache is request-scoped — it stats the same seeded key 5× within one PHP process (1 HTTP call + 4 cache hits), then once each in two separate processes (2 HTTP calls, no carry-over). Writes `results/cache-scope-benchmark.csv`.
 
 ### Reading the Report
 
