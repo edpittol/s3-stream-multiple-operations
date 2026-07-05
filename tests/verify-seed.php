@@ -8,17 +8,7 @@
 require_once __DIR__ . '/../vendor/autoload.php';
 
 try {
-    // Create S3 client pointing to Toxiproxy
-    $s3Client = new \Aws\S3\S3Client([
-        'version' => 'latest',
-        'region'  => 'us-east-1',
-        'endpoint' => 'http://toxiproxy:20000',
-        'use_path_style_endpoint' => true,
-        'credentials' => [
-            'key'    => 'minioadmin',
-            'secret' => 'minioadmin',
-        ],
-    ]);
+    $s3Client = createS3Client();
 
     echo "Verifying seed results...\n\n";
 

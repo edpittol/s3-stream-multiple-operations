@@ -43,9 +43,9 @@ docker compose -p "$ALT" ps --status running --quiet | grep -q . || fail "instan
 pass "both instances running at once"
 
 echo "Running the s3:// smoke test in each instance..."
-docker compose exec -T php bin/smoke-test-e2e.php >/dev/null || fail "smoke test failed in instance A"
+docker compose exec -T php tests/smoke-test-e2e.php >/dev/null || fail "smoke test failed in instance A"
 pass "smoke test passed in instance A"
-docker compose -p "$ALT" exec -T php bin/smoke-test-e2e.php >/dev/null || fail "smoke test failed in instance B"
+docker compose -p "$ALT" exec -T php tests/smoke-test-e2e.php >/dev/null || fail "smoke test failed in instance B"
 pass "smoke test passed in instance B"
 
 echo "Cleaning instance A only..."

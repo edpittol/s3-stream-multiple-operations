@@ -12,32 +12,14 @@ require_once __DIR__ . '/../vendor/autoload.php';
 try {
     echo "Initializing S3 client...\n";
 
-    // Create S3 client pointing to Toxiproxy
-    $s3Client = new \Aws\S3\S3Client([
-        'version' => 'latest',
-        'region'  => 'us-east-1',
-        'endpoint' => 'http://toxiproxy:20000',
-        'use_path_style_endpoint' => true,
-        'credentials' => [
-            'key'    => 'minioadmin',
-            'secret' => 'minioadmin',
-        ],
-    ]);
+    $s3Client = createS3Client();
 
     $bucketName = 'benchmark';
 
     // Ensure bucket exists (idempotent)
     echo "Ensuring bucket exists: $bucketName\n";
-    try {
-        $s3Client->headBucket(['Bucket' => $bucketName]);
-        echo "  → Bucket already exists\n";
-    } catch (\Exception $e) {
-        echo "  → Creating bucket...\n";
-        $s3Client->createBucket(['Bucket' => $bucketName]);
-        // Wait for bucket to be created
-        sleep(1);
-        echo "  → Bucket created\n";
-    }
+    ensureBucketExists($s3Client, $bucketName);
+    echo "  → Bucket ready\n";
 
     // Generate seed data: ~1 KB per object (realistic text content)
     // Using a sample CSS-like content to simulate the blog post's use case
