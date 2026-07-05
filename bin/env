@@ -1,19 +1,35 @@
 #!/bin/bash
 set -e
 
-# Single entrypoint that wraps the per-instance environment commands
-# (up/seed/bench/clean). Each command still lives in its own bin/<name>
-# script; this just dispatches to it, forwarding all remaining arguments
-# (including `-p <project-name>`).
+# Single entrypoint for the per-instance environment commands
+# (up/seed/bench/clean). Each command's implementation still lives in its own
+# bin/<name> file, but those files are not meant to be invoked directly --
+# bin/env is the only supported entry point, and the single source of truth
+# for help/usage text.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
-  echo "Usage: bin/env <up|seed|bench|clean> [args...]" >&2
+  cat <<'EOF'
+Usage: bin/env <command> [-p <project-name>]
+
+Commands:
+  up      Bring up an isolated MinIO + Toxiproxy + PHP stack
+  seed    Seed the benchmark bucket with test objects
+  bench   Sweep RTT scenarios and write a benchmark CSV report
+  clean   Tear down a single isolated stack
+
+  -p <project-name>  Target a specific instance (default: derived from cwd)
+  -h, --help         Show this help, or `bin/env <command> -h` for a command
+EOF
+}
+
+command_usage() {
+  echo "Usage: bin/env $1 [-p <project-name>]"
 }
 
 if [ $# -lt 1 ]; then
-  usage
+  usage >&2
   exit 1
 fi
 
@@ -21,16 +37,22 @@ CMD="$1"
 shift
 
 case "$CMD" in
-  up|seed|bench|clean)
-    exec "$SCRIPT_DIR/$CMD" "$@"
-    ;;
   -h|--help)
     usage
     exit 0
     ;;
+  up|seed|bench|clean)
+    for arg in "$@"; do
+      if [ "$arg" = "-h" ] || [ "$arg" = "--help" ]; then
+        command_usage "$CMD"
+        exit 0
+      fi
+    done
+    exec bash "$SCRIPT_DIR/$CMD" "$@"
+    ;;
   *)
     echo "Unknown command: $CMD" >&2
-    usage
+    usage >&2
     exit 1
     ;;
 esac

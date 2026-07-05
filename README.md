@@ -26,22 +26,21 @@ This script will:
 
 A complete Docker Compose environment is provided to test S3 stream operations with a realistic setup including MinIO (S3-compatible storage), Toxiproxy (for latency injection), and PHP with the AWS SDK.
 
-All environment commands (`up`, `seed`, `bench`, `clean`) are also reachable through a single entrypoint, `bin/env`, which forwards to the matching `bin/<command>` script — e.g. `./bin/env up` is equivalent to `./bin/up`. Each command still lives in its own file; use whichever form you prefer.
+`bin/env` is the single entry point for the environment commands (`up`, `seed`, `bench`, `clean`); each command's implementation lives in its own `bin/<command>` file, but those files are not meant to be run directly. Run `bin/env -h` for the full command list, or `bin/env <command> -h` for a specific command's flags.
 
 ### Starting the Stack
 
 To bring up the Docker environment (MinIO, Toxiproxy, PHP), run:
 
 ```bash
-./bin/up
-# or: ./bin/env up
+./bin/env up
 ```
 
 This will:
 - Start MinIO (S3 + console), Toxiproxy (pointing to MinIO), and the PHP container with Composer and the AWS SDK installed
 - Configure the Toxiproxy `minio` proxy with the `s3` service as upstream
 
-Only the MinIO **console** is published to the host, on an **ephemeral (Docker-assigned) port**. The S3 API and Toxiproxy (listener + admin) stay on the internal Compose network and are reached via `docker compose exec` / service names (`s3:9000`, `toxiproxy:20000`). `bin/up` prints the console's mapped host URL for the instance it just started:
+Only the MinIO **console** is published to the host, on an **ephemeral (Docker-assigned) port**. The S3 API and Toxiproxy (listener + admin) stay on the internal Compose network and are reached via `docker compose exec` / service names (`s3:9000`, `toxiproxy:20000`). `bin/env up` prints the console's mapped host URL for the instance it just started:
 
 ```
 Services (host URLs for this instance):
@@ -55,19 +54,17 @@ Read the printed port to open the console; it changes each time the stack starts
 
 Each stack is namespaced by the Compose **project name**, so containers, the network, and the data volume never collide between instances.
 
-- **Auto-naming (default):** the project name is derived from the working directory, so two different clones or git worktrees just work in parallel with no config — run `./bin/up` in each.
+- **Auto-naming (default):** the project name is derived from the working directory, so two different clones or git worktrees just work in parallel with no config — run `./bin/env up` in each.
 - **Second instance from the same directory:** pass a project name with `-p`:
 
   ```bash
-  ./bin/up                # instance A (auto-named from the directory)
-  ./bin/up -p experiment  # instance B, fully isolated
+  ./bin/env up                # instance A (auto-named from the directory)
+  ./bin/env up -p experiment  # instance B, fully isolated
   ```
 
-  If bringing a stack up hits a name/port collision, `bin/up` prints guidance to re-run with `-p <name>`.
+  If bringing a stack up hits a name/port collision, `bin/env up` prints guidance to re-run with `-p <name>`.
 
-`bin/seed`, `bin/bench`, `bin/clean`, and the smoke test all accept the same `-p <name>` flag and act on that instance only. Reach a specific instance's containers with `docker compose -p <name> exec ...`.
-
-Every command above also works through `bin/env`, e.g. `./bin/env up -p experiment`.
+`bin/env seed`, `bin/env bench`, `bin/env clean`, and the smoke test all accept the same `-p <name>` flag and act on that instance only. Reach a specific instance's containers with `docker compose -p <name> exec ...`.
 
 ### Running the End-to-End Smoke Test
 
@@ -90,9 +87,8 @@ This smoke test will:
 To tear down a single instance and remove its volumes:
 
 ```bash
-./bin/clean            # cleans the auto-named instance for this directory
-./bin/clean -p experiment   # cleans only the `experiment` instance
-# or: ./bin/env clean [-p experiment]
+./bin/env clean            # cleans the auto-named instance for this directory
+./bin/env clean -p experiment   # cleans only the `experiment` instance
 ```
 
 This acts on the selected instance only — cleaning one leaves any other running instances untouched. It will:
@@ -109,7 +105,7 @@ The benchmark measures latency of S3 file operations (file_exists, stat, file_pu
 **Prerequisites**: The Docker environment must be running:
 
 ```bash
-./bin/up
+./bin/env up
 ```
 
 The benchmark suite will seed MinIO with test objects automatically when needed.
@@ -119,9 +115,8 @@ The benchmark suite will seed MinIO with test objects automatically when needed.
 To run the complete RTT-sweep benchmark across all operations and backends:
 
 ```bash
-./bin/bench                # against the auto-named instance
-./bin/bench -p experiment  # against a specific instance
-# or: ./bin/env bench [-p experiment]
+./bin/env bench                # against the auto-named instance
+./bin/env bench -p experiment  # against a specific instance
 ```
 
 The benchmark runs inside the instance's `php` container and configures Toxiproxy over the internal network, so no host ports are required. It will:
@@ -190,7 +185,7 @@ This benchmark proves that the AWS SDK's `LruArrayCache` stat cache is request-s
 **Prerequisites**: The Docker environment must be running:
 
 ```bash
-./bin/up
+./bin/env up
 ```
 
 ### Running the Cache-Scope Benchmark

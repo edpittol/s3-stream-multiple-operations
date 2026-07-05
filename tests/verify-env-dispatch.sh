@@ -1,7 +1,8 @@
 #!/bin/bash
-# Verify bin/env dispatches to the right per-command script, forwarding all
-# arguments, and rejects unknown subcommands. Uses `-h` on each target so
-# this runs without Docker.
+# Verify bin/env is the sole entry point for the environment commands
+# (up/seed/bench/clean): the per-command scripts must not be directly
+# executable, bin/env must dispatch to them, all help/usage text must live
+# in bin/env, and unknown/missing subcommands must be rejected.
 #
 # Run from the repo root: tests/verify-env-dispatch.sh
 
@@ -14,13 +15,23 @@ cd "$PROJECT_ROOT"
 pass() { echo "  ✓ $1"; }
 fail() { echo "  ✗ $1"; exit 1; }
 
-echo "Verifying bin/env dispatch..."
-
+echo "Verifying per-command scripts are not directly executable..."
 for cmd in up seed bench clean; do
-  expected="$(./bin/"$cmd" -h)"
-  actual="$(./bin/env "$cmd" -h)"
-  [ "$expected" = "$actual" ] || fail "bin/env $cmd -h did not match bin/$cmd -h"
-  pass "bin/env $cmd forwards to bin/$cmd"
+  [ -x "./bin/$cmd" ] && fail "bin/$cmd should not be directly executable"
+  pass "bin/$cmd is not directly executable"
+done
+
+echo "Verifying bin/env top-level help documents every command..."
+HELP="$(./bin/env -h)"
+for cmd in up seed bench clean; do
+  echo "$HELP" | grep -q "$cmd" || fail "bin/env -h does not mention '$cmd'"
+done
+pass "bin/env -h documents up, seed, bench, clean"
+
+echo "Verifying bin/env <command> -h shows command-specific help..."
+for cmd in up seed bench clean; do
+  ./bin/env "$cmd" -h | grep -q "Usage: bin/env $cmd" || fail "bin/env $cmd -h missing usage line"
+  pass "bin/env $cmd -h documented"
 done
 
 echo "Checking unknown subcommand is rejected..."

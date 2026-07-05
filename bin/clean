@@ -5,11 +5,10 @@ set -e
 # Compose project name (auto-derived from the working directory, or `-p <name>`).
 
 PROJECT=""
-while getopts "p:h" opt; do
+while getopts "p:" opt; do
   case "$opt" in
     p) PROJECT="$OPTARG" ;;
-    h) echo "Usage: bin/clean [-p <project-name>]"; exit 0 ;;
-    *) echo "Usage: bin/clean [-p <project-name>]" >&2; exit 1 ;;
+    *) echo "Usage: bin/env clean [-p <project-name>]" >&2; exit 1 ;;
   esac
 done
 

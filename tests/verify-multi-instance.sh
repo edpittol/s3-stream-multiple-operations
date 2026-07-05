@@ -3,7 +3,7 @@
 #
 # Proves two isolated stacks run in parallel from the same directory:
 #   - instance A: default, auto-named from the working directory
-#   - instance B: started with `bin/up -p <name>`
+#   - instance B: started with `bin/env up -p <name>`
 # The end-to-end s3:// smoke test must pass in each, and cleaning one must
 # leave the other running.
 #
@@ -18,8 +18,8 @@ cd "$PROJECT_ROOT"
 ALT="mi-test-alt"
 
 cleanup() {
-  ./bin/clean >/dev/null 2>&1 || true
-  ./bin/clean -p "$ALT" >/dev/null 2>&1 || true
+  ./bin/env clean >/dev/null 2>&1 || true
+  ./bin/env clean -p "$ALT" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -32,10 +32,10 @@ echo "Verifying multi-instance isolation..."
 cleanup
 
 echo "Bringing up instance A (auto-named)..."
-./bin/up >/dev/null
+./bin/env up >/dev/null
 
 echo "Bringing up instance B (-p $ALT) from the same directory..."
-./bin/up -p "$ALT" >/dev/null
+./bin/env up -p "$ALT" >/dev/null
 
 echo "Checking both stacks are up simultaneously..."
 docker compose ps --status running --quiet | grep -q . || fail "instance A has no running containers"
@@ -49,7 +49,7 @@ docker compose -p "$ALT" exec -T php bin/smoke-test-e2e.php >/dev/null || fail "
 pass "smoke test passed in instance B"
 
 echo "Cleaning instance A only..."
-./bin/clean >/dev/null
+./bin/env clean >/dev/null
 docker compose ps --status running --quiet | grep -q . && fail "instance A still running after clean"
 pass "instance A cleaned"
 docker compose -p "$ALT" ps --status running --quiet | grep -q . || fail "instance B stopped when cleaning A"

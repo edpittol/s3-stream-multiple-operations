@@ -7,11 +7,10 @@ set -e
 # Seeds the instance selected by the Compose project name (auto-derived from
 # the working directory, or `-p <name>`).
 PROJECT=""
-while getopts "p:h" opt; do
+while getopts "p:" opt; do
   case "$opt" in
     p) PROJECT="$OPTARG" ;;
-    h) echo "Usage: bin/seed [-p <project-name>]"; exit 0 ;;
-    *) echo "Usage: bin/seed [-p <project-name>]" >&2; exit 1 ;;
+    *) echo "Usage: bin/env seed [-p <project-name>]" >&2; exit 1 ;;
   esac
 done
 

@@ -8,11 +8,10 @@ set -e
 # `-p <name>` to start a second isolated instance from the same directory.
 
 PROJECT=""
-while getopts "p:h" opt; do
+while getopts "p:" opt; do
   case "$opt" in
     p) PROJECT="$OPTARG" ;;
-    h) echo "Usage: bin/up [-p <project-name>]"; exit 0 ;;
-    *) echo "Usage: bin/up [-p <project-name>]" >&2; exit 1 ;;
+    *) echo "Usage: bin/env up [-p <project-name>]" >&2; exit 1 ;;
   esac
 done
 
@@ -27,7 +26,7 @@ if ! dc up -d; then
   echo "  This is usually a name/port collision with another instance." >&2
   echo "  Start an isolated instance under a different project name:" >&2
   echo "" >&2
-  echo "      bin/up -p <name>" >&2
+  echo "      bin/env up -p <name>" >&2
   echo "" >&2
   exit 1
 fi
