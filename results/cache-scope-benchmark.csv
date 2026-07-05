@@ -1,0 +1,3 @@
+Scenario,"HTTP Calls","Cache Hits","Timing (ms)"
+Single-Process,1,4,"First: 16.519ms, Avg Cached: 1.558ms"
+Cross-Process,2,0,"Process 1: 8.413ms, Process 2: 12.819ms"

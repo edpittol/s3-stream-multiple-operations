@@ -129,13 +129,13 @@ For testing a single operation or backend, use the PHP script directly:
 
 ```bash
 # Test file_exists on local filesystem
-php src/benchmark.php --backend local --op file_exists
+docker compose exec php src/benchmark.php --backend local --op file_exists
 
 # Test file_put_contents on S3 with 50ms RTT
-php src/benchmark.php --backend s3 --op file_put_contents --rtt-ms 50
+docker compose exec php src/benchmark.php --backend s3 --op file_put_contents --rtt-ms 50
 
 # Output to CSV file
-php src/benchmark.php --backend s3 --op stat --rtt-ms 75 --output results/custom-benchmark.csv
+docker compose exec php src/benchmark.php --backend s3 --op stat --rtt-ms 75 --output results/custom-benchmark.csv
 ```
 
 ### Understanding the CSV Output
@@ -154,3 +154,64 @@ The benchmark outputs CSV with the following columns:
 ### Interpreting Results
 
 Each benchmark run measures 5 repetitions of 200 distinct file operations (1000 total operations per test). The RTT-sweep helps identify how network latency impacts S3 operations compared to local filesystem operations. The `median_ns` column is typically used for page-time reconstruction (multiply by ~88 for typical S3-backed CMS page view).
+
+### Cache-Scope Benchmark
+
+This benchmark proves that the AWS SDK's `LruArrayCache` stat cache is request-scoped: it lives in process memory and dies when the PHP process ends, so nothing carries over between web requests.
+
+**Prerequisites**: The Docker environment must be running:
+
+```bash
+./bin/up
+```
+
+### Running the Cache-Scope Benchmark
+
+To run both scenarios and record results to CSV:
+
+```bash
+docker compose exec php bin/benchmark-cache-scope.php
+```
+
+This will:
+- Run the single-process scenario: stat the same key 5× within one PHP process → 1 HTTP call + 4 cache hits
+- Run the cross-process scenario: stat the same key once in each of two separate PHP processes → the HTTP call repeats (no carry-over)
+- Output results to `results/cache-scope-benchmark.csv`
+- Print a conclusion summarizing cache-scope behavior
+
+### Example Output
+
+```
+Cache Scope Benchmark
+=====================
+
+Running single-process scenario...
+  ✓ HTTP calls: 1, Cache hits: 4
+    Timing: First=20.123ms, Avg Cached=1.456ms
+
+Running cross-process scenario...
+  ✓ HTTP calls: 2, Cache hits: 0
+    Timing: Process1=12.345ms, Process2=11.987ms
+
+Recording results to CSV...
+Results written to: results/cache-scope-benchmark.csv
+
+✓✓✓ Cache Scope Benchmark Complete ✓✓✓
+
+Conclusion:
+  The AWS SDK's LruArrayCache is request-scoped.
+  - Within a process: first call makes HTTP request, subsequent calls use cache
+  - Across processes: each process makes its own HTTP request
+```
+
+### Understanding the CSV Output
+
+The benchmark outputs CSV with the following columns:
+- **Scenario**: `Single-Process` or `Cross-Process`
+- **HTTP Calls**: Number of HTTP calls the AWS SDK made in the scenario
+- **Cache Hits**: Number of stat calls served from the in-process cache
+- **Timing (ms)**: Per-call timing evidence (first vs. cached call for single-process; per-process timing for cross-process)
+
+### Interpreting Results
+
+The single-process scenario should show 1 HTTP call and 4 cache hits, with the first call noticeably slower than the cached calls (network latency vs. in-memory lookup). The cross-process scenario should show 2 HTTP calls and 0 cache hits, with both processes taking similar (network-latency-bound) time — proving the cache does not persist across process boundaries.
