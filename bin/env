@@ -1,0 +1,36 @@
+#!/bin/bash
+set -e
+
+# Single entrypoint that wraps the per-instance environment commands
+# (up/seed/bench/clean). Each command still lives in its own bin/<name>
+# script; this just dispatches to it, forwarding all remaining arguments
+# (including `-p <project-name>`).
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+  echo "Usage: bin/env <up|seed|bench|clean> [args...]" >&2
+}
+
+if [ $# -lt 1 ]; then
+  usage
+  exit 1
+fi
+
+CMD="$1"
+shift
+
+case "$CMD" in
+  up|seed|bench|clean)
+    exec "$SCRIPT_DIR/$CMD" "$@"
+    ;;
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Unknown command: $CMD" >&2
+    usage
+    exit 1
+    ;;
+esac

@@ -26,12 +26,15 @@ This script will:
 
 A complete Docker Compose environment is provided to test S3 stream operations with a realistic setup including MinIO (S3-compatible storage), Toxiproxy (for latency injection), and PHP with the AWS SDK.
 
+All environment commands (`up`, `seed`, `bench`, `clean`) are also reachable through a single entrypoint, `bin/env`, which forwards to the matching `bin/<command>` script — e.g. `./bin/env up` is equivalent to `./bin/up`. Each command still lives in its own file; use whichever form you prefer.
+
 ### Starting the Stack
 
 To bring up the Docker environment (MinIO, Toxiproxy, PHP), run:
 
 ```bash
 ./bin/up
+# or: ./bin/env up
 ```
 
 This will:
@@ -64,6 +67,8 @@ Each stack is namespaced by the Compose **project name**, so containers, the net
 
 `bin/seed`, `bin/bench`, `bin/clean`, and the smoke test all accept the same `-p <name>` flag and act on that instance only. Reach a specific instance's containers with `docker compose -p <name> exec ...`.
 
+Every command above also works through `bin/env`, e.g. `./bin/env up -p experiment`.
+
 ### Running the End-to-End Smoke Test
 
 To verify the entire PHP → Toxiproxy → MinIO path works correctly, run:
@@ -87,6 +92,7 @@ To tear down a single instance and remove its volumes:
 ```bash
 ./bin/clean            # cleans the auto-named instance for this directory
 ./bin/clean -p experiment   # cleans only the `experiment` instance
+# or: ./bin/env clean [-p experiment]
 ```
 
 This acts on the selected instance only — cleaning one leaves any other running instances untouched. It will:
@@ -115,6 +121,7 @@ To run the complete RTT-sweep benchmark across all operations and backends:
 ```bash
 ./bin/bench                # against the auto-named instance
 ./bin/bench -p experiment  # against a specific instance
+# or: ./bin/env bench [-p experiment]
 ```
 
 The benchmark runs inside the instance's `php` container and configures Toxiproxy over the internal network, so no host ports are required. It will:

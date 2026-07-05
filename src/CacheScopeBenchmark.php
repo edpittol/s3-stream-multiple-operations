@@ -21,7 +21,7 @@ class CacheScopeBenchmark
         $s3Client = new S3Client([
             'version' => 'latest',
             'region'  => 'us-east-1',
-            'endpoint' => 'http://localhost:20000',
+            'endpoint' => getenv('S3_ENDPOINT') ?: 'http://localhost:20000',
             'use_path_style_endpoint' => true,
             'credentials' => [
                 'key'    => 'minioadmin',
@@ -115,7 +115,7 @@ use Aws\S3\S3Client;
 $s3 = new S3Client([
     'version' => 'latest',
     'region' => 'us-east-1',
-    'endpoint' => 'http://localhost:20000',
+    'endpoint' => getenv('S3_ENDPOINT') ?: 'http://localhost:20000',
     'use_path_style_endpoint' => true,
     'credentials' => [
         'key' => 'minioadmin',
@@ -194,7 +194,7 @@ class TrackedS3Client
         $this->client = new S3Client([
             'version' => 'latest',
             'region'  => 'us-east-1',
-            'endpoint' => 'http://localhost:20000',
+            'endpoint' => getenv('S3_ENDPOINT') ?: 'http://localhost:20000',
             'use_path_style_endpoint' => true,
             'credentials' => [
                 'key'    => 'minioadmin',
