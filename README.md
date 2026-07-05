@@ -129,13 +129,13 @@ For testing a single operation or backend, use the PHP script directly:
 
 ```bash
 # Test file_exists on local filesystem
-php src/benchmark.php --backend local --op file_exists
+docker compose exec php src/benchmark.php --backend local --op file_exists
 
 # Test file_put_contents on S3 with 50ms RTT
-php src/benchmark.php --backend s3 --op file_put_contents --rtt-ms 50
+docker compose exec php src/benchmark.php --backend s3 --op file_put_contents --rtt-ms 50
 
 # Output to CSV file
-php src/benchmark.php --backend s3 --op stat --rtt-ms 75 --output results/custom-benchmark.csv
+docker compose exec php src/benchmark.php --backend s3 --op stat --rtt-ms 75 --output results/custom-benchmark.csv
 ```
 
 ### Understanding the CSV Output
@@ -170,7 +170,7 @@ This benchmark proves that the AWS SDK's `LruArrayCache` stat cache is request-s
 To run both scenarios and record results to CSV:
 
 ```bash
-php bin/benchmark-cache-scope.php
+docker compose exec php bin/benchmark-cache-scope.php
 ```
 
 This will:
