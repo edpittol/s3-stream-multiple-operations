@@ -1,10 +1,12 @@
 services:
   s3:
     image: minio/minio:latest
-    container_name: s3-minio
+    # No container_name / no fixed host ports: containers, network, and volume
+    # are namespaced by the Compose project name so instances stay isolated.
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      # Human-facing console only, on an ephemeral (Docker-assigned) host port.
+      # The S3 API (9000) is reached over the internal network as s3:9000.
+      - "9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -21,10 +23,8 @@ services:
 
   toxiproxy:
     image: ghcr.io/shopify/toxiproxy:2.5.0
-    container_name: toxiproxy-s3
-    ports:
-      - "20000:20000"
-      - "8474:8474"
+    # Listener (20000) and admin (8474) are reached over the internal network
+    # / `docker compose exec`; neither is published to the host.
     networks:
       - s3-network
     depends_on:
@@ -35,7 +35,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.php
-    container_name: php-dev
     working_dir: /app
     volumes:
       - .:/app

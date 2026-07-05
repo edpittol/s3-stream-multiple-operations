@@ -1,9 +1,22 @@
 #!/bin/bash
 set -e
 
+# Tear down a single isolated stack. Operates on the instance selected by the
+# Compose project name (auto-derived from the working directory, or `-p <name>`).
+
+PROJECT=""
+while getopts "p:" opt; do
+  case "$opt" in
+    p) PROJECT="$OPTARG" ;;
+    *) echo "Usage: bin/env clean [-p <project-name>]" >&2; exit 1 ;;
+  esac
+done
+
+dc() { docker compose ${PROJECT:+-p "$PROJECT"} "$@"; }
+
 echo "Cleaning up S3 benchmark stack..."
 
-# Stop and remove containers
-docker compose down -v --remove-orphans
+# Stop and remove containers, network, and volumes for this instance only.
+dc down -v --remove-orphans
 
 echo "✓ Stack cleaned up (containers removed, volumes deleted)"

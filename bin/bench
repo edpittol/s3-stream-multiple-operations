@@ -5,6 +5,18 @@ set -e
 # Outputs CSV to results/benchmark-<timestamp>.csv with columns:
 # scenario, op, backend, rtt_ms, n, median_ns, p95_ns, min_ns, max_ns
 
+# Runs against the instance selected by the Compose project name (auto-derived
+# from the working directory, or `-p <name>`).
+PROJECT=""
+while getopts "p:" opt; do
+  case "$opt" in
+    p) PROJECT="$OPTARG" ;;
+    *) echo "Usage: bin/env bench [-p <project-name>]" >&2; exit 1 ;;
+  esac
+done
+
+dc() { docker compose ${PROJECT:+-p "$PROJECT"} "$@"; }
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RESULTS_DIR="$PROJECT_ROOT/results"
@@ -12,8 +24,10 @@ RESULTS_DIR="$PROJECT_ROOT/results"
 # Create results directory
 mkdir -p "$RESULTS_DIR"
 
-# Output file with timestamp
+# Output file with timestamp. Written under /app/results in the php container,
+# which is bind-mounted to $RESULTS_DIR on the host.
 TIMESTAMP=$(date +%s)
+CONTAINER_OUTPUT="results/benchmark-$TIMESTAMP.csv"
 OUTPUT_FILE="$RESULTS_DIR/benchmark-$TIMESTAMP.csv"
 
 # RTT values to sweep
@@ -36,26 +50,17 @@ echo "scenario,op,backend,rtt_ms,n,median_ns,p95_ns,min_ns,max_ns" > "$OUTPUT_FI
 for rtt in "${RTT_VALUES[@]}"; do
     echo "Setting Toxiproxy latency to ${rtt}ms..."
 
-    # Configure Toxiproxy latency toxic (only for s3)
+    # Configure Toxiproxy via the container CLI over the internal network
+    # (no host admin port). Clear any prior latency toxic first so sweep steps
+    # don't stack, then add the current one for rtt > 0.
+    for prev in "${RTT_VALUES[@]}"; do
+        dc exec -T toxiproxy /toxiproxy-cli toxic delete -n "latency-${prev}ms" minio > /dev/null 2>&1 || true
+    done
     if [ "$rtt" -gt 0 ]; then
-        curl -s -X POST http://localhost:8474/proxies/minio/toxics \
-            -H "Content-Type: application/json" \
-            -d "{
-                \"name\": \"latency-${rtt}ms\",
-                \"type\": \"latency\",
-                \"stream\": \"upstream\",
-                \"toxicity\": 1.0,
-                \"attributes\": {
-                    \"latency\": $rtt,
-                    \"jitter\": 0
-                }
-            }" > /dev/null 2>&1 || echo "  (Warning: Could not configure Toxiproxy latency - is Toxiproxy running?)"
-    else
-        # Remove toxics for 0 RTT (best-effort cleanup)
-        # Use a simple loop instead of jq which might not be available
-        for i in {1..10}; do
-            curl -s -X DELETE "http://localhost:8474/proxies/minio/toxics/latency-${i}ms" > /dev/null 2>&1 || true
-        done
+        dc exec -T toxiproxy /toxiproxy-cli toxic add \
+            -t latency -n "latency-${rtt}ms" --upstream \
+            -a "latency=$rtt" -a "jitter=0" minio > /dev/null 2>&1 \
+            || echo "  (Warning: Could not configure Toxiproxy latency - is the stack up?)"
     fi
 
     # Small delay to ensure Toxiproxy is ready
@@ -66,12 +71,13 @@ for rtt in "${RTT_VALUES[@]}"; do
         for backend in "${BACKENDS[@]}"; do
             echo "  Benchmarking: op=$op backend=$backend rtt=${rtt}ms"
 
-            # Run benchmark in fresh process
-            php "$PROJECT_ROOT/src/benchmark.php" \
+            # Run benchmark in a fresh process inside the php container, which
+            # reaches Toxiproxy over the internal network (S3_ENDPOINT).
+            dc exec -T php php src/benchmark.php \
                 --backend "$backend" \
                 --op "$op" \
                 --rtt-ms "$rtt" \
-                --output "$OUTPUT_FILE"
+                --output "$CONTAINER_OUTPUT"
         done
     done
 done

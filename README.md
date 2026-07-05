@@ -26,24 +26,45 @@ This script will:
 
 A complete Docker Compose environment is provided to test S3 stream operations with a realistic setup including MinIO (S3-compatible storage), Toxiproxy (for latency injection), and PHP with the AWS SDK.
 
+`bin/env` is the single entry point for the environment commands (`up`, `seed`, `bench`, `clean`); each command's implementation lives in its own `bin/<command>` file, but those files are not meant to be run directly. Run `bin/env -h` for the full command list, or `bin/env <command> -h` for a specific command's flags.
+
 ### Starting the Stack
 
 To bring up the Docker environment (MinIO, Toxiproxy, PHP), run:
 
 ```bash
-./bin/up
+./bin/env up
 ```
 
 This will:
-- Start MinIO S3 service on port 9000 (with console on 9001)
-- Start Toxiproxy on port 20000 (pointing to MinIO) and admin interface on 8474
-- Start the PHP container with Composer and AWS SDK installed
+- Start MinIO (S3 + console), Toxiproxy (pointing to MinIO), and the PHP container with Composer and the AWS SDK installed
+- Configure the Toxiproxy `minio` proxy with the `s3` service as upstream
 
-Services available at:
-- MinIO S3: `http://localhost:9000`
-- MinIO Console: `http://localhost:9001`
-- Toxiproxy listener (for S3 operations): `http://localhost:20000`
-- Toxiproxy admin API: `http://localhost:8474`
+Only the MinIO **console** is published to the host, on an **ephemeral (Docker-assigned) port**. The S3 API and Toxiproxy (listener + admin) stay on the internal Compose network and are reached via `docker compose exec` / service names (`s3:9000`, `toxiproxy:20000`). `bin/env up` prints the console's mapped host URL for the instance it just started:
+
+```
+Services (host URLs for this instance):
+  - MinIO Console: http://0.0.0.0:62207
+  - S3 API / Toxiproxy: internal network only (s3:9000, toxiproxy:20000)
+```
+
+Read the printed port to open the console; it changes each time the stack starts.
+
+### Running Multiple Instances in Parallel
+
+Each stack is namespaced by the Compose **project name**, so containers, the network, and the data volume never collide between instances.
+
+- **Auto-naming (default):** the project name is derived from the working directory, so two different clones or git worktrees just work in parallel with no config — run `./bin/env up` in each.
+- **Second instance from the same directory:** pass a project name with `-p`:
+
+  ```bash
+  ./bin/env up                # instance A (auto-named from the directory)
+  ./bin/env up -p experiment  # instance B, fully isolated
+  ```
+
+  If bringing a stack up hits a name/port collision, `bin/env up` prints guidance to re-run with `-p <name>`.
+
+`bin/env seed`, `bin/env bench`, `bin/env clean`, and the smoke test all accept the same `-p <name>` flag and act on that instance only. Reach a specific instance's containers with `docker compose -p <name> exec ...`.
 
 ### Running the End-to-End Smoke Test
 
@@ -63,16 +84,17 @@ This smoke test will:
 
 ### Cleaning Up
 
-To tear down the Docker environment and remove all volumes:
+To tear down a single instance and remove its volumes:
 
 ```bash
-./bin/clean
+./bin/env clean            # cleans the auto-named instance for this directory
+./bin/env clean -p experiment   # cleans only the `experiment` instance
 ```
 
-This will:
-- Stop all containers
-- Remove containers and networks
-- Delete all data volumes (including MinIO data)
+This acts on the selected instance only — cleaning one leaves any other running instances untouched. It will:
+- Stop the instance's containers
+- Remove its containers and network
+- Delete its data volume (including MinIO data)
 
 ## Running Benchmarks
 
@@ -83,7 +105,7 @@ The benchmark measures latency of S3 file operations (file_exists, stat, file_pu
 **Prerequisites**: The Docker environment must be running:
 
 ```bash
-./bin/up
+./bin/env up
 ```
 
 The benchmark suite will seed MinIO with test objects automatically when needed.
@@ -93,10 +115,11 @@ The benchmark suite will seed MinIO with test objects automatically when needed.
 To run the complete RTT-sweep benchmark across all operations and backends:
 
 ```bash
-./bin/bench
+./bin/env bench                # against the auto-named instance
+./bin/env bench -p experiment  # against a specific instance
 ```
 
-This will:
+The benchmark runs inside the instance's `php` container and configures Toxiproxy over the internal network, so no host ports are required. It will:
 - Sweep RTT values (0, 10, 20, 40 ms) using Toxiproxy latency injection
 - Run all operations (file_exists, stat, file_put_contents)
 - Test both backends (local filesystem, S3)
@@ -162,7 +185,7 @@ This benchmark proves that the AWS SDK's `LruArrayCache` stat cache is request-s
 **Prerequisites**: The Docker environment must be running:
 
 ```bash
-./bin/up
+./bin/env up
 ```
 
 ### Running the Cache-Scope Benchmark
