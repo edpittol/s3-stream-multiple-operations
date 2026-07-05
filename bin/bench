@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Benchmark orchestrator: sweeps RTT 0/20/75/125 ms, runs benchmark in fresh process per data point
+# Benchmark orchestrator: sweeps RTT 0/10/20/40 ms, runs benchmark in fresh process per data point
 # Outputs CSV to results/benchmark-<timestamp>.csv with columns:
 # scenario, op, backend, rtt_ms, n, median_ns, p95_ns, min_ns, max_ns
 
@@ -17,7 +17,7 @@ TIMESTAMP=$(date +%s)
 OUTPUT_FILE="$RESULTS_DIR/benchmark-$TIMESTAMP.csv"
 
 # RTT values to sweep
-RTT_VALUES=(0 20 75 125)
+RTT_VALUES=(0 10 20 40)
 
 # Operations to benchmark
 OPS=("file_exists" "stat" "file_put_contents")
