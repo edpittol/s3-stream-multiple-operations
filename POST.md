@@ -116,3 +116,7 @@ The page dropped from ~10 seconds to well under a second. Same features, same S3
 - **Remember that a cache can't save a write.** Reads can be cached; every `PutObject` is a real round trip. Batch writes, defer them off the request path, or keep them local and mirror asynchronously.
 
 And the principle underneath all of it: **when an abstraction changes the cost model by orders of magnitude, it has to leak that cost somewhere.** An abstraction that hides a 50 ms network call behind a microsecond-shaped function isn't a convenience — it's a latency bug waiting for production traffic. Put the cost back where you can see it: a persistent cache, a batched call, or a local-first layer. Don't let `file_exists()` keep wearing a syscall's clothes.
+
+---
+
+*All the measurements in this post come from a small, self-contained benchmark rig — MinIO standing in for S3, Toxiproxy injecting the round-trip latency, and the PHP scripts that produced every table above. It's on GitHub: [edpittol/s3-stream-multiple-operations](https://github.com/edpittol/s3-stream-multiple-operations). Clone it and reproduce the numbers.*
