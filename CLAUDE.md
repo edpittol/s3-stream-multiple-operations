@@ -6,7 +6,7 @@
 
 ### Issue tracker
 
-Issues are tracked as GitHub Issues in edpittol/s3-stream-multiple-operations, using the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues are tracked as GitHub Issues in edpittol/s3-stream-multiple-operations, using the `gh` CLI. External PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
