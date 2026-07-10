@@ -1,7 +1,7 @@
 ---
 title: "Your file_exists() Is Secretly a Network Call"
 published: false
-description: How PHP stream wrappers turn innocent filesystem checks into synchronous S3 round trips — and how one WordPress homepage ended up spending 90% of its time on HeadObject calls.
+description: A WordPress homepage spent 90% of its load time on HeadObject calls — because PHP stream wrappers quietly turn file_exists() into a synchronous S3 round trip.
 tags: php, performance, aws, webdev
 ---
 
@@ -19,7 +19,7 @@ Nothing about that line looks dangerous. It's the kind of guard clause you've wr
 s3://my-bucket/cache/style-4f2a.css
 ```
 
-Now that single `file_exists()` is not a syscall. It's a `HeadObject` request to Amazon S3 — a network round trip that leaves your server, waits for S3, and comes back. On a cold cache, one such check measured **~57 ms** in my test rig.
+Now that single `file_exists()` is not a syscall. It's a `HeadObject` request to Amazon S3 — a network round trip that leaves your server, waits for S3, and comes back. Against distant S3, that round trip costs tens of milliseconds.
 
 Here's the twist that makes it dangerous: the AWS SDK caches that result in memory, so a *second* check of the same path is instant. The cost hides behind the cache. But every web request is a fresh PHP process with an empty cache, so the first touch of every path pays full price — every request. And writes are never cached at all: at 40 ms of round-trip latency, a single `file_put_contents()` over S3 took ~50 ms, so 88 of them add up to **4.4 seconds**.
 
@@ -48,7 +48,7 @@ If you've ever hunted down an **N+1 query** in an ORM, you already understand th
 
 The numbers below come from a controlled rig: a local MinIO standing in for S3, with [Toxiproxy](https://github.com/Shopify/toxiproxy) injecting a fixed round-trip time (RTT) of 0, 10, 20, or 40 ms — roughly the spread from same-AZ to cross-region.
 
-## POC 1: the cost scales with the network
+## The benchmark: cost scales with the network
 
 Median latency per call, S3 backend, as RTT climbs (local disk stays ≤ 0.01 ms for all three):
 
@@ -70,20 +70,9 @@ Now scale to a page. A single real page in the incident below fired **88** files
 
 At 40 ms RTT — a cross-region hop — 88 writes cost **4.36 seconds**. That's the cliff, and every extra millisecond between you and S3 makes it steeper.
 
-But look at the read rows: 2 ms for 88 checks. That looks harmless. That's the cache talking — and it's about to betray you.
+But look at the read rows: 2 ms for 88 checks. That looks harmless — and it's the most misleading number in the table. It's low only because the benchmark checks the same paths repeatedly inside one long-lived process, so the SDK's in-memory stat cache absorbs the repeats. Nothing crosses the wire twice.
 
-## POC 2: the cache that dies with the request
-
-The read numbers are low because the benchmark checks the same path repeatedly, and the SDK serves the repeats from an in-memory `LruArrayCache`. Count the actual HTTP calls and the illusion breaks:
-
-| Scenario | HTTP calls | Cache hits |
-|---|---|---|
-| Single process, 5 checks | 1 | 4 |
-| Same work across two processes | 2 | 0 |
-
-In one process, four of five checks are free. Split the same work across two processes — exactly what happens when two web requests hit your server — and the hit rate falls to **zero**: each process re-fetches from S3. The first, cold check measured **~57 ms**.
-
-Because PHP builds every request in a fresh process, the cache is always cold at the start of a request. The "2 ms for 88 reads" from POC 1 only exists in a benchmark that reuses one process. In production, the first touch of each *distinct* path is a full round trip — and if your code checks 73 distinct files, that's 73 cold round trips. Which is exactly what happened next.
+PHP in production doesn't work that way. Every web request is served by a fresh process with an empty cache, and that cache is gone the moment the request ends — the `LruArrayCache` lives in process memory, not in Redis or on disk. So the first touch of each *distinct* path is always a full round trip, and nothing carries over to the next request. If a page checks 73 distinct files, that's 73 cold round trips — every request. Which is exactly what happened next.
 
 ## The war story: a 10-second homepage
 
@@ -91,15 +80,15 @@ This isn't hypothetical. A high-traffic WordPress site, with its media library b
 
 New Relic told the story immediately. `GET /` returned HTTP 200 in 10.07 s — with an **empty database-queries tab**. No slow SQL. Roughly 90% of the time was synchronous S3 traffic, all inside a single page view:
 
-| Segment | Calls | Time | % |
-|---|---|---|---|
-| `s3.amazonaws.com` | 73 | 3,281 ms | 32.6% |
-| Guzzle `CurlMultiHandler::tick` | 59 | 2,623 ms | 26.1% |
-| Stream wrapper closure | 88 | 1,702 ms | 16.9% |
-| `AwsClient::execute` | 124 | 1,582 ms | 15.7% |
-| Guzzle `CurlMultiHandler::execute` | 78 | 873 ms | 8.7% |
+| Segment | Calls | Time |
+|---|---|---|
+| `s3.amazonaws.com` | 73 | 3,281 ms |
+| Guzzle `CurlMultiHandler::tick` | 59 | 2,623 ms |
+| Stream wrapper closure | 88 | 1,702 ms |
+| `AwsClient::execute` | 124 | 1,582 ms |
+| Guzzle `CurlMultiHandler::execute` | 78 | 873 ms |
 
-**73 real S3 calls to render one homepage.** The theme's CSS layer was the culprit: for every style handle, on every breakpoint, on every request, it called `file_exists()` on the generated stylesheet to decide whether to regenerate — dozens of `HeadObject`s per page — *even though it already held a persisted flag saying the cache was valid.* Those were 73 **distinct** paths, so the in-process cache never helped; and because the SDK's stat cache was request-scoped (POC 2, live and in production), nothing survived to the next request either. Every check was a cold round trip.
+**73 real S3 calls to render one homepage.** The theme's CSS layer was the culprit: for every style handle, on every breakpoint, on every request, it called `file_exists()` on the generated stylesheet to decide whether to regenerate — dozens of `HeadObject`s per page — *even though it already held a persisted flag saying the cache was valid.* Those were 73 **distinct** paths, so the in-process cache never helped; and because the SDK's stat cache was request-scoped — an in-memory cache that dies with the PHP process — nothing survived to the next request either. Every check was a cold round trip.
 
 The fix was a tour of **where a cache can live** — each layer trading something different:
 
