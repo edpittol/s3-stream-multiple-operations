@@ -2,6 +2,7 @@
 title: "Your file_exists() Is Secretly a Network Call"
 published: false
 description: A WordPress homepage spent 90% of its load time on HeadObject calls — because PHP stream wrappers quietly turn file_exists() into a synchronous S3 round trip.
+cover_image: https://raw.githubusercontent.com/edpittol/s3-stream-multiple-operations/main/assets/cover.png
 tags: php, performance, aws, webdev
 ---
 
