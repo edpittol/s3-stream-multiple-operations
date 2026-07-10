@@ -93,21 +93,18 @@ The full flow, in order, is: bring the stack up, seed it, run the benchmarks, th
 ```bash
 ./bin/env up            # docker compose up -d (+ Toxiproxy config)
 ./bin/env seed          # docker compose exec php src/seed.php
-./bin/env bench         # RTT sweep + cache-scope benchmark
+./bin/env bench         # RTT sweep
 ./bin/report            # php src/report.php
 ```
 
-**`bin/env seed` is required, not automatic** — both benchmarks below read fixed, pre-seeded object keys (`benchmark-object-000`, `benchmark-object-001`, ...) and fail if the bucket hasn't been seeded first.
+**`bin/env seed` populates the `benchmark` bucket** with 200 stable ~1 KB objects (`benchmark-object-000` … `benchmark-object-199`) via the SDK through Toxiproxy, giving the stack a realistic dataset before you benchmark.
 
-`./bin/env bench` runs both benchmarks:
-- **RTT-sweep**: sweeps Toxiproxy latency (0, 10, 20, 40 ms) and times `file_exists`, `stat`, and `file_put_contents` against both `local` and `s3://` backends, 200 keys × 5 reps per data point. Writes `results/benchmark-<timestamp>.csv`.
-- **Cache-scope**: proves the AWS SDK's `LruArrayCache` stat cache is request-scoped — it stats the same seeded key 5× within one PHP process (1 HTTP call + 4 cache hits), then once each in two separate processes (2 HTTP calls, no carry-over). Writes `results/cache-scope-benchmark.csv`.
+`./bin/env bench` runs the RTT-sweep benchmark: it sweeps Toxiproxy latency (0, 10, 20, 40 ms) and times `file_exists`, `stat`, and `file_put_contents` against both `local` and `s3://` backends, 200 keys × 5 reps per data point. Writes `results/benchmark-<timestamp>.csv`.
 
 ### Reading the Report
 
 `./bin/report` reads every CSV under `results/` and writes `RESULTS.md` at the project root — markdown tables only, no charts or images:
 - **Per-op median latency by RTT**: median latency for each operation/backend pair, across the RTT sweep.
 - **Reconstructed page-time**: the same medians × 88 (typical S3-backed CMS page view's op count), to translate raw latency into a page-load figure.
-- **Cache-scope call counts**: HTTP calls vs. cache hits for the single-process and cross-process scenarios.
 
 See [RESULTS.md](RESULTS.md) for the numbers from a real run — `results/` itself is gitignored, so raw CSVs aren't committed, but the generated report is.
