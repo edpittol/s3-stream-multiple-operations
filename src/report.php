@@ -1,9 +1,9 @@
 #!/usr/bin/env php
 <?php
 /**
- * Reads results/*.csv (the RTT-sweep benchmark-<timestamp>.csv files and
- * cache-scope-benchmark.csv) and writes RESULTS.md at the project root as
- * markdown tables: no chart tooling, no images.
+ * Reads the RTT-sweep benchmark-<timestamp>.csv files under results/ and
+ * writes RESULTS.md at the project root as markdown tables: no chart
+ * tooling, no images.
  */
 
 $projectRoot = dirname(__DIR__);
@@ -91,23 +91,7 @@ function buildBenchmarkTables(string $file): array
     return [implode("\n", $medianLines), implode("\n", $pageTimeLines)];
 }
 
-function buildCacheScopeTable(string $file): string
-{
-    $rows = readCsv($file);
-
-    $lines = [
-        "| Scenario | HTTP Calls | Cache Hits | Timing (ms) |",
-        "|---|---|---|---|",
-    ];
-    foreach ($rows as $row) {
-        $lines[] = "| {$row['Scenario']} | {$row['HTTP Calls']} | {$row['Cache Hits']} | {$row['Timing (ms)']} |";
-    }
-
-    return implode("\n", $lines);
-}
-
 $benchmarkFile = latestBenchmarkFile($resultsDir);
-$cacheScopeFile = $resultsDir . '/cache-scope-benchmark.csv';
 
 $sections = [];
 $sections[] = "# Results";
@@ -123,13 +107,6 @@ if ($benchmarkFile === null) {
     $sections[] = $medianTable;
     $sections[] = "## Reconstructed page-time (median × 88 ops/page)";
     $sections[] = $pageTimeTable;
-}
-
-$sections[] = "## Cache-scope call counts";
-if (!file_exists($cacheScopeFile)) {
-    $sections[] = "No cache-scope benchmark data found. Run `docker compose exec php bin/benchmark-cache-scope.php` first.";
-} else {
-    $sections[] = buildCacheScopeTable($cacheScopeFile);
 }
 
 $outputPath = $projectRoot . '/RESULTS.md';
