@@ -3,7 +3,7 @@ title: "Your file_exists() Is Secretly a Network Call"
 published: false
 description: A WordPress homepage spent 90% of its load time on HeadObject calls — because PHP stream wrappers quietly turn file_exists() into a synchronous S3 round trip.
 cover_image: https://raw.githubusercontent.com/edpittol/s3-stream-multiple-operations/main/assets/cover.png
-tags: php, performance, aws, webdev
+tags: php, performance, aws, s3
 ---
 
 ## The one-line horror
@@ -22,7 +22,7 @@ s3://my-bucket/cache/style-4f2a.css
 
 Now that single `file_exists()` is not a syscall. It's a `HeadObject` request to Amazon S3 — a network round trip that leaves your server, waits for S3, and comes back. Against distant S3, that round trip costs tens of milliseconds.
 
-Here's the twist that makes it dangerous: the AWS SDK caches that result in memory, so a *second* check of the same path is instant. The cost hides behind the cache. But every web request is a fresh PHP process with an empty cache, so the first touch of every path pays full price — every request. And writes are never cached at all: at 40 ms of round-trip latency, a single `file_put_contents()` over S3 took ~50 ms, so 88 of them add up to **4.4 seconds**.
+Here's the twist that makes it dangerous: the AWS SDK caches that result in memory, so a *second* check of the same path is instant. The cost hides behind the cache. But every web request is a fresh PHP process with an empty cache, so the first touch of every path pays full price — every request. And writes never get even that reprieve: nothing caches a `PutObject`, so every `file_put_contents()` over S3 is a full round trip, every time. Reads can ride the cache; writes always cross the wire.
 
 Local `stat()` costs microseconds. The code doesn't change — only the string in `$path` does. PHP stream wrappers make remote storage look like a local disk, and code written for local-disk economics keeps compiling, keeps passing tests, and silently falls off a performance cliff the moment the path points at a bucket.
 
@@ -51,7 +51,7 @@ The numbers below come from a controlled rig: a local MinIO standing in for S3, 
 
 ## The benchmark: cost scales with the network
 
-Median latency per call, S3 backend, as RTT climbs (local disk stays ≤ 0.01 ms for all three):
+Median latency per call, S3 backend, as RTT climbs (local disk stays ≤ 0.01 ms for all operations at every RTT):
 
 | S3 operation | RTT 0 ms | 10 ms | 20 ms | 40 ms |
 |---|---|---|---|---|
@@ -69,7 +69,7 @@ Now scale to a page. A single real page in the incident below fired **88** files
 | `stat` | 0.17 ms | 1.94 ms | 2.55 ms | 2.81 ms |
 | `file_put_contents` | 128.5 ms | 1,580.6 ms | 2,607.1 ms | 4,360.5 ms |
 
-At 40 ms RTT — a cross-region hop — 88 writes cost **4.36 seconds**. That's the cliff, and every extra millisecond between you and S3 makes it steeper.
+At 40 ms RTT — a cross-region hop — 88 writes cost **~4.4 seconds**. That's the cliff, and every extra millisecond between you and S3 makes it steeper.
 
 But look at the read rows: 2 ms for 88 checks. That looks harmless — and it's the most misleading number in the table. It's low only because the benchmark checks the same paths repeatedly inside one long-lived process, so the SDK's in-memory stat cache absorbs the repeats. Nothing crosses the wire twice.
 
